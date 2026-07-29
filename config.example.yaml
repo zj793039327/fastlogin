@@ -1,0 +1,45 @@
+# fastlogin example config. Copy to ~/.config/fastlogin/config.yaml
+
+groups:
+  - name: 生产环境
+    description: 线上机器，谨慎操作
+    entries:
+      - name: web-01
+        type: ssh
+        host: 10.0.1.10
+        user: root
+        port: 22
+        auth:
+          password: "secret"
+        tags: [web, prod]
+
+      - name: db-01
+        type: ssh
+        host: 10.0.1.20
+        user: admin
+        auth:
+          pem: ~/.ssh/db01.pem
+
+  - name: 开发环境
+    entries:
+      - name: local-dev
+        type: ssh
+        host: 127.0.0.1
+        user: dev
+        auth:
+          password: "dev123"
+
+      - name: mysql-repl
+        type: command
+        command: mysql -h 10.0.1.20 -u admin -p
+
+entries:
+  - name: quick-ssh
+    type: ssh
+    host: 1.2.3.4
+    user: root
+    auth:
+      pem: ~/.ssh/id_rsa
+
+# Merge non-wildcard Hosts from ~/.ssh/config into a virtual "ssh-config" group.
+include_ssh_config: true
