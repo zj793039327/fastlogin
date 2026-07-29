@@ -57,25 +57,4 @@ func ExpandPath(p string) (string, error) {
 	return p, nil
 }
 
-// applyDefaults fills in default Type ("ssh") and Port (22) for any entry
-// that leaves them unset. Explicit values are preserved.
-func applyDefaults(c *Config) {
-	for i := range c.Groups {
-		for j := range c.Groups[i].Entries {
-			if c.Groups[i].Entries[j].Type == "" {
-				c.Groups[i].Entries[j].Type = "ssh"
-			}
-			if c.Groups[i].Entries[j].Port == 0 {
-				c.Groups[i].Entries[j].Port = 22
-			}
-		}
-	}
-	for i := range c.Entries {
-		if c.Entries[i].Type == "" {
-			c.Entries[i].Type = "ssh"
-		}
-		if c.Entries[i].Port == 0 {
-			c.Entries[i].Port = 22
-		}
-	}
-}
+
