@@ -36,7 +36,7 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -trimpath -ldflags "-s -w" -o fastlogin .
+        run: go build -trimpath -ldflags "-s -w" -o fastlogin${{ matrix.goos == 'windows' && '.exe' || '' }} .
 
       - name: Package (unix)
         if: matrix.goos != 'windows'
