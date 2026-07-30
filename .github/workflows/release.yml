@@ -130,3 +130,54 @@ jobs:
           git add Formula/fastlogin.rb
           git commit -m "fastlogin ${{ steps.vars.outputs.version }}"
           git push
+
+  bump-scoop:
+    # 发布 Release 后，自动更新 scoop-bucket 仓库的 manifest 并推送
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute version
+        id: vars
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch windows sha256
+        id: sha
+        run: |
+          BASE="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
+          WIN=$(curl -fsSL "${BASE}/fastlogin_${{ github.ref_name }}_windows_amd64.zip.sha256" | awk '{print $1}')
+          echo "win=${WIN}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout scoop-bucket
+        uses: actions/checkout@v4
+        with:
+          repository: zj793039327/scoop-bucket
+          token: ${{ secrets.TAP_TOKEN }}
+          path: bucket
+
+      - name: Update manifest
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${{ steps.vars.outputs.version }}"
+          WIN="${{ steps.sha.outputs.win }}"
+          REPO="${{ github.repository }}"
+
+          URL="https://github.com/${REPO}/releases/download/${TAG}/fastlogin_${TAG}_windows_amd64.zip"
+
+          jq \
+            --arg version "${VERSION}" \
+            --arg url "${URL}" \
+            --arg hash "${WIN}" \
+            '.version=$version | .architecture."64bit".url=$url | .architecture."64bit".hash=$hash' \
+            bucket/fastlogin.json > bucket/fastlogin.json.tmp \
+            && mv bucket/fastlogin.json.tmp bucket/fastlogin.json
+          echo "=== Updated manifest ==="
+          cat bucket/fastlogin.json
+
+      - name: Commit & push
+        run: |
+          cd bucket
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add fastlogin.json
+          git commit -m "fastlogin ${{ steps.vars.outputs.version }}"
+          git push
