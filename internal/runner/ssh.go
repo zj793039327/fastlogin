@@ -10,6 +10,7 @@ import (
 	"fastlogin/internal/config"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/term"
 )
 
@@ -68,6 +69,62 @@ func (r *SSHRunner) Run(ctx context.Context, e config.Entry) error {
 	return session.Wait()
 }
 
+// defaultKeyFiles are the conventional SSH private-key locations tried when
+// the user requests pem: default.
+var defaultKeyFiles = []string{
+	"~/.ssh/id_ed25519",
+	"~/.ssh/id_ecdsa",
+	"~/.ssh/id_rsa",
+	"~/.ssh/id_dsa",
+}
+
+// defaultAuthMethods returns auth methods derived from the local machine's SSH
+// configuration: the SSH agent, then any host-specific IdentityFile from
+// ~/.ssh/config, then the conventional default private-key files under ~/.ssh/.
+func defaultAuthMethods(e config.Entry) []ssh.AuthMethod {
+	var methods []ssh.AuthMethod
+
+	// 1. SSH agent — the conn is kept open; signers query it lazily during Dial.
+	if socket := os.Getenv("SSH_AUTH_SOCK"); socket != "" {
+		if conn, err := net.Dial("unix", socket); err == nil {
+			agentClient := agent.NewClient(conn)
+			if signers, err := agentClient.Signers(); err == nil && len(signers) > 0 {
+				methods = append(methods, ssh.PublicKeys(signers...))
+			}
+		}
+	}
+
+	// 2. Host-specific IdentityFile from ~/.ssh/config.
+	if pem := config.SSHConfigIdentityFile(e.Host); pem != "" {
+		if path, err := config.ExpandPath(pem); err == nil {
+			if key, err := os.ReadFile(path); err == nil {
+				if signer, err := ssh.ParsePrivateKey(key); err == nil {
+					methods = append(methods, ssh.PublicKeys(signer))
+				}
+			}
+		}
+	}
+
+	// 3. Default key files under ~/.ssh/.
+	for _, p := range defaultKeyFiles {
+		path, err := config.ExpandPath(p)
+		if err != nil {
+			continue
+		}
+		key, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			continue
+		}
+		methods = append(methods, ssh.PublicKeys(signer))
+	}
+
+	return methods
+}
+
 // authMethods builds ssh.AuthMethod list from the entry's Auth.
 func authMethods(e config.Entry) ([]ssh.AuthMethod, error) {
 	if e.Auth == nil {
@@ -77,7 +134,9 @@ func authMethods(e config.Entry) ([]ssh.AuthMethod, error) {
 	if e.Auth.Password != "" {
 		methods = append(methods, ssh.Password(e.Auth.Password))
 	}
-	if e.Auth.PEM != "" {
+	if e.Auth.PEM == "default" {
+		methods = append(methods, defaultAuthMethods(e)...)
+	} else if e.Auth.PEM != "" {
 		path, err := config.ExpandPath(e.Auth.PEM)
 		if err != nil {
 			return nil, fmt.Errorf("expand pem path: %w", err)

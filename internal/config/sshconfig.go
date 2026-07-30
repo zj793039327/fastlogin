@@ -94,6 +94,22 @@ func loadSSHConfig() ([]Entry, error) {
 	return parseSSHConfig(path)
 }
 
+// SSHConfigIdentityFile returns the IdentityFile path configured for the given
+// host in ~/.ssh/config (matching either the Host alias or HostName), or "" if
+// none is found.
+func SSHConfigIdentityFile(host string) string {
+	entries, err := loadSSHConfig()
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if (e.Name == host || e.Host == host) && e.Auth != nil && e.Auth.PEM != "" {
+			return e.Auth.PEM
+		}
+	}
+	return ""
+}
+
 // merge adds ssh-config entries to the config as a virtual "ssh-config" group,
 // skipping any whose Address() already exists.
 func merge(c *Config, sshEntries []Entry) {

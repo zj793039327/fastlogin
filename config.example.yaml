@@ -39,7 +39,7 @@ entries:
     host: 1.2.3.4
     user: root
     auth:
-      pem: ~/.ssh/id_rsa
+      pem: default   # 使用本机 SSH agent + ~/.ssh/ 下默认私钥 (id_rsa/id_ed25519 等)
 
 # Merge non-wildcard Hosts from ~/.ssh/config into a virtual "ssh-config" group.
 include_ssh_config: true
