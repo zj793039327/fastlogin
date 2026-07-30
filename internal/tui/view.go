@@ -43,7 +43,7 @@ func (m Model) View() string {
 	if m.searching {
 		b.WriteString("search: " + m.search)
 	} else {
-		b.WriteString(dimStyle.Render("↑↓ navigate · →/← fold · ⏎ connect · / search · q quit"))
+		b.WriteString(dimStyle.Render("↑↓/kj navigate · →←/hl fold · ⏎ connect · / search · q quit"))
 	}
 	if m.err != "" {
 		b.WriteString("\n" + errStyle.Render(m.err))

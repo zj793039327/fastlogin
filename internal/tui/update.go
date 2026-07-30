@@ -37,19 +37,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 
-		case "up":
+		case "up", "k":
 			if m.searching {
+				if msg.String() == "k" {
+					m.search += "k"
+					m.cursor = 0
+				}
 				break
 			}
 			m.moveCursor(-1)
 
-		case "down":
+		case "down", "j":
 			if m.searching {
+				if msg.String() == "j" {
+					m.search += "j"
+					m.cursor = 0
+				}
 				break
 			}
 			m.moveCursor(1)
 
-		case "right", "left", "tab":
+		case "right", "left", "tab", "h", "l":
+			if m.searching {
+				if ch := msg.String(); ch == "h" || ch == "l" {
+					m.search += ch
+					m.cursor = 0
+				}
+				break
+			}
 			if r := m.currentRow(); r != nil && r.Kind == RowGroup {
 				m.expanded[r.GroupIdx] = !m.expanded[r.GroupIdx]
 			}
