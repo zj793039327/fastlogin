@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -trimpath -ldflags "-s -w" -o fastlogin .
+
+      - name: Package (unix)
+        if: matrix.goos != 'windows'
+        run: |
+          tar -czf fastlogin_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz fastlogin
+          shasum -a 256 fastlogin_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz > fastlogin_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz.sha256
+
+      - name: Package (windows)
+        if: matrix.goos == 'windows'
+        run: |
+          zip fastlogin_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip fastlogin.exe
+          shasum -a 256 fastlogin_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip > fastlogin_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            *.tar.gz
+            *.tar.gz.sha256
+            *.zip
+            *.zip.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            dist/fastlogin_*
