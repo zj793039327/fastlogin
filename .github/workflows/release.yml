@@ -84,6 +84,9 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout fastlogin (for the formula template)
+        uses: actions/checkout@v4
+
       - name: Compute formula values
         id: vars
         run: |
@@ -106,53 +109,16 @@ jobs:
           token: ${{ secrets.TAP_TOKEN }}
           path: tap
 
-      - name: Update Formula
+      - name: Update Formula from template
         run: |
-          VERSION="${{ steps.vars.outputs.version }}"
-          TAG="${{ github.ref_name }}"
-          ARM="${{ steps.sha.outputs.arm }}"
-          INTEL="${{ steps.sha.outputs.intel }}"
-          REPO="${{ github.repository }}"
-
           mkdir -p tap/Formula
-          # 单引号 heredoc：原样保留内容（含 Ruby 的 #{bin}），不做 shell 插值
-          # 之后用 sed 把 @VAR@ 占位符替换成实际值
-          cat > tap/Formula/fastlogin.rb <<'RUBY'
-class Fastlogin < Formula
-  desc "Interactive terminal command launcher (SSH + commands)"
-  homepage "https://github.com/@REPO@"
-  version "@VERSION@"
-  license "MIT"
-
-  on_macos do
-    on_arm do
-      url "https://github.com/@REPO@/releases/download/@TAG@/fastlogin_@TAG@_darwin_arm64.tar.gz"
-      sha256 "@ARM@"
-    end
-
-    on_intel do
-      url "https://github.com/@REPO@/releases/download/@TAG@/fastlogin_@TAG@_darwin_amd64.tar.gz"
-      sha256 "@INTEL@"
-    end
-  end
-
-  def install
-    bin.install "fastlogin"
-  end
-
-  test do
-    assert_match "fastlogin", shell_output("#{bin}/fastlogin 2>&1", 1)
-  end
-end
-RUBY
-
-          sed -i \
-            -e "s|@REPO@|${REPO}|g" \
-            -e "s|@VERSION@|${VERSION}|g" \
-            -e "s|@TAG@|${TAG}|g" \
-            -e "s|@ARM@|${ARM}|g" \
-            -e "s|@INTEL@|${INTEL}|g" \
-            tap/Formula/fastlogin.rb
+          sed \
+            -e "s|@REPO@|${{ github.repository }}|g" \
+            -e "s|@VERSION@|${{ steps.vars.outputs.version }}|g" \
+            -e "s|@TAG@|${{ github.ref_name }}|g" \
+            -e "s|@ARM@|${{ steps.sha.outputs.arm }}|g" \
+            -e "s|@INTEL@|${{ steps.sha.outputs.intel }}|g" \
+            .github/formula-template.rb > tap/Formula/fastlogin.rb
           echo "=== Generated Formula ==="
           cat tap/Formula/fastlogin.rb
 
